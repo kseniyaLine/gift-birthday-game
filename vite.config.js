@@ -8,7 +8,5 @@ export default defineConfig({
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],
-  build: {
-    outDir: 'build',
-  },
+  base: '/gift-birthday-game/',
 })
