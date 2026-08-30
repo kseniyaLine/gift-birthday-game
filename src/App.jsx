@@ -15,7 +15,8 @@ const COIN_HITBOX = 14; // Радиус зоны подбора
 
 const App = () => {
   const canvasRef = useRef(null);
-  const coinImageRef = useRef(null); // Ref для хранения загруженного Image()
+  const coinImageRef = useRef(null);
+  const bgImageRef = useRef(null)
   const [isPaused, setIsPaused] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
@@ -42,6 +43,10 @@ const App = () => {
     const img = new Image();
     img.src = coinImgSrc;
     coinImageRef.current = img;
+
+    const bgImg = new Image();
+    bgImg.src = bgImage;
+    bgImageRef.current = bgImg;
   }, []);
 
   useEffect(() => {
@@ -219,6 +224,19 @@ const App = () => {
       // --- ОТРИСОВКА ---
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+      // 1. Отрисовка фона
+      const bgImg = bgImageRef.current;
+      if (bgImg && bgImg.complete) {
+        ctx.drawImage(bgImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        // Затемнение поверх фона
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      } else {
+        // Темный цвет по умолчанию, пока картинка загружается
+        ctx.fillStyle = '#121212';
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      }
+
       // Отрисовка серых стен
       state.segments.forEach((seg) => {
         ctx.fillStyle = '#2b2d42';
@@ -297,10 +315,7 @@ const App = () => {
         style={{
           border: '3px solid #333',
           borderRadius: '12px',
-          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${bgImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
+          backgroundColor: '#121212',
           touchAction: 'none',
           cursor: 'pointer',
         }}
