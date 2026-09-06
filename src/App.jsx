@@ -61,7 +61,7 @@ const App = () => {
     obstacles: [],
   });
 
-  // Загрузка изображений
+  // Исправленная загрузка изображений (сначала события, потом src)
   useEffect(() => {
     const assets = [
       { ref: coinImageRef, src: coinImgSrc },
@@ -74,14 +74,24 @@ const App = () => {
 
     assets.forEach(({ ref, src }) => {
       const img = new Image();
-      img.src = src;
-      img.onload = () => {
+      ref.current = img;
+
+      const handleLoad = () => {
+        img.onload = null;
+        img.onerror = null;
         loadedCount += 1;
         if (loadedCount === assets.length) {
           setIsLoading(false);
         }
       };
-      ref.current = img;
+
+      img.onload = handleLoad;
+      img.onerror = handleLoad; // Страховка от зависания, если файл не найдется
+      img.src = src;
+
+      if (img.complete && img.naturalWidth !== 0) {
+        handleLoad();
+      }
     });
   }, []);
 
@@ -243,7 +253,7 @@ const App = () => {
           }
         }
 
-        // Спавн препятствий сверху (снижена скорость их падения)
+        // Спавн препятствий сверху
         if (animTickRef.current % OBS_SPAWN_RATE === 0) {
           const minCorridorX = PROTRUSION_WALL + OBS_SIZE / 2;
           const maxCorridorX = CANVAS_WIDTH - PROTRUSION_WALL - OBS_SIZE / 2;
@@ -259,7 +269,7 @@ const App = () => {
           state.obstacles.push({
             x: spawnX,
             y: -OBS_SIZE,
-            speed: 2.5 + Math.random() * 3, // Медленная и комфортная скорость
+            speed: 2.5 + Math.random() * 1.5,
           });
         }
 
@@ -325,6 +335,7 @@ const App = () => {
       // 2. Стены
       state.segments.forEach((seg) => {
         ctx.fillStyle = '#2b2d42';
+        ctx.lineWidth = 2;
 
         ctx.fillRect(0, seg.y, seg.leftWidth, seg.height);
         ctx.strokeRect(0, seg.y, seg.leftWidth, seg.height);
