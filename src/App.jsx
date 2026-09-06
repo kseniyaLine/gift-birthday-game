@@ -38,7 +38,10 @@ const App = () => {
   const playerSpriteRef = useRef(null);
   const obstacleSpriteRef = useRef(null);
   const wallImageRef = useRef(null);
+  
   const animTickRef = useRef(0);
+  const lastTimeRef = useRef(0);
+  const spawnTimerRef = useRef(0);
 
   const [isLoading, setIsLoading] = useState(true);
   const [gameOver, setGameOver] = useState(false);
@@ -61,7 +64,7 @@ const App = () => {
     obstacles: [],
   });
 
-  // Исправленная загрузка изображений (сначала события, потом src)
+  // Загрузка изображений
   useEffect(() => {
     const assets = [
       { ref: coinImageRef, src: coinImgSrc },
@@ -87,7 +90,7 @@ const App = () => {
       };
 
       img.onload = handleLoad;
-      img.onerror = handleLoad; // Страховка от зависания, если файл не найдется
+      img.onerror = handleLoad;
       img.src = src;
 
       if (img.complete && img.naturalWidth !== 0) {
@@ -125,6 +128,8 @@ const App = () => {
     };
 
     animTickRef.current = 0;
+    spawnTimerRef.current = 0;
+    lastTimeRef.current = performance.now();
     setScore(0);
     setGameOver(false);
   };
@@ -163,22 +168,29 @@ const App = () => {
 
     canvas.addEventListener('pointerdown', handleCanvasClick);
 
-    const render = () => {
+    const render = (currentTime) => {
+      if (!lastTimeRef.current) lastTimeRef.current = currentTime;
+
+      // Расчет дельты времени для стабилизации FPS (норма за основу — 60 FPS)
+      const delta = (currentTime - lastTimeRef.current) / 1000;
+      lastTimeRef.current = currentTime;
+      const timeScale = Math.min(delta * 60, 2); // Ограничение на случай зависаний
+
       const state = gameStateRef.current;
 
       if (!state.gameOver) {
         const player = state.player;
 
         // Движение мира и монеток
-        state.segments.forEach((seg) => (seg.y += SCROLL_SPEED));
+        state.segments.forEach((seg) => (seg.y += SCROLL_SPEED * timeScale));
         state.coins.forEach((coin) => {
-          coin.y += SCROLL_SPEED;
-          coin.angle += 0.08;
+          coin.y += SCROLL_SPEED * timeScale;
+          coin.angle += 0.08 * timeScale;
         });
 
-        // Полет препятствий сверху вниз
+        // Полет препятствий
         state.obstacles.forEach((obs) => {
-          obs.y += obs.speed;
+          obs.y += obs.speed * timeScale;
         });
 
         const currentSeg = state.segments.find(
@@ -189,7 +201,7 @@ const App = () => {
 
         // Перемещение игрока
         if (player.isJumping) {
-          player.x += player.vx;
+          player.x += player.vx * timeScale;
 
           if (player.vx > 0) {
             const rightBoundary = CANVAS_WIDTH - currentRightW - player.width;
@@ -248,8 +260,11 @@ const App = () => {
           }
         }
 
-        // Спавн препятствий сверху
-        if (animTickRef.current % OBS_SPAWN_RATE === 0) {
+        // Таймер спавна препятствий с учетом Delta Time
+        spawnTimerRef.current += timeScale;
+        if (spawnTimerRef.current >= OBS_SPAWN_RATE) {
+          spawnTimerRef.current %= OBS_SPAWN_RATE;
+          
           const minCorridorX = PROTRUSION_WALL + OBS_SIZE / 2;
           const maxCorridorX = CANVAS_WIDTH - PROTRUSION_WALL - OBS_SIZE / 2;
 
@@ -310,7 +325,7 @@ const App = () => {
           }
         }
 
-        animTickRef.current += 1;
+        animTickRef.current += timeScale;
       }
 
       // --- ОТРИСОВКА ---
@@ -334,15 +349,16 @@ const App = () => {
           ctx.drawImage(wallImg, 0, seg.y, seg.leftWidth, seg.height);
           ctx.drawImage(wallImg, CANVAS_WIDTH - seg.rightWidth, seg.y, seg.rightWidth, seg.height);
         } else {
-             ctx.fillStyle = '#2b2d42';
-        ctx.lineWidth = 2;
+          ctx.fillStyle = '#2b2d42';
+          ctx.lineWidth = 2;
 
-        ctx.fillRect(0, seg.y, seg.leftWidth, seg.height);
-        ctx.strokeRect(0, seg.y, seg.leftWidth, seg.height);
+          ctx.fillRect(0, seg.y, seg.leftWidth, seg.height);
+          ctx.strokeRect(0, seg.y, seg.leftWidth, seg.height);
 
-        ctx.fillRect(CANVAS_WIDTH - seg.rightWidth, seg.y, seg.rightWidth, seg.height);
-        ctx.strokeRect(CANVAS_WIDTH - seg.rightWidth, seg.y, seg.rightWidth, seg.height);
-    }})
+          ctx.fillRect(CANVAS_WIDTH - seg.rightWidth, seg.y, seg.rightWidth, seg.height);
+          ctx.strokeRect(CANVAS_WIDTH - seg.rightWidth, seg.y, seg.rightWidth, seg.height);
+        }
+      });
 
       // 3. Монетки
       const coinImg = coinImageRef.current;
@@ -398,10 +414,11 @@ const App = () => {
 
       ctx.save();
       ctx.translate(p.x + p.width / 2, p.y + p.height / 2);
-      if(p.side === 'right') {
+      if (p.side === 'right') {
         ctx.rotate((-90 * Math.PI) / 180);
-      } else ctx.rotate((90 * Math.PI) / 180);
-      
+      } else {
+        ctx.rotate((90 * Math.PI) / 180);
+      }
 
       if (spriteImg && spriteImg.complete) {
         const frameWidth = spriteImg.naturalWidth / PLAYER_COLS;
@@ -421,10 +438,11 @@ const App = () => {
         );
       }
       ctx.restore();
+
       animationFrameId = requestAnimationFrame(render);
     };
 
-    render();
+    animationFrameId = requestAnimationFrame(render);
 
     return () => {
       canvas.removeEventListener('pointerdown', handleCanvasClick);
@@ -452,12 +470,13 @@ const App = () => {
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', touchAction: 'none' }}>
       <canvas
         ref={canvasRef}
         style={{
           touchAction: 'none',
           cursor: 'pointer',
+          display: 'block'
         }}
       />
       {gameOver && (
@@ -474,13 +493,18 @@ const App = () => {
           alignItems: 'center',
           justifyContent: 'center',
           flexDirection: 'column',
-          gap: '5px',
-          backgroundColor: 'rgba(0, 0, 0, 0.5)'
+          gap: '10px',
+          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+          userSelect: 'none'
         }}>
-          <p>Game over</p>        
-          <p style={{ fontSize: '18px' }}>{score} Huba Bubas</p>
+          <p style={{ margin: 0 }}>Game Over</p>
+          <p style={{ fontSize: '18px', margin: 0 }}>{score} Huba Bubas</p>
           <button
             onClick={restartGame}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              restartGame();
+            }}
             style={{
               padding: '12px 28px',
               fontSize: '18px',
@@ -490,6 +514,7 @@ const App = () => {
               borderRadius: '8px',
               cursor: 'pointer',
               boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
+              touchAction: 'manipulation'
             }}
           >
             Restart
