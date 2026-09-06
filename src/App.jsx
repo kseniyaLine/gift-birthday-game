@@ -14,10 +14,10 @@ const PLAYER_ANIM_SPEED = 4;
 const OBS_ROWS = 8;
 const OBS_COLS = 9;
 const OBS_TOTAL_FRAMES = 70;
-const OBS_ANIM_SPEED = 1.5;
+const OBS_ANIM_SPEED = 2;
 const OBS_SIZE = 40;
 const OBS_HITBOX_RADIUS = 16;
-const OBS_SPAWN_RATE = 240; // Увеличено: спавн реже (каждые ~4 секунды)
+const OBS_SPAWN_RATE = 240; 
 
 const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
@@ -38,6 +38,7 @@ const App = () => {
   const obstacleSpriteRef = useRef(null);
   const animTickRef = useRef(0);
 
+  const [isLoading, setIsLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
@@ -60,22 +61,28 @@ const App = () => {
     obstacles: [],
   });
 
+  // Загрузка изображений
   useEffect(() => {
-    const img = new Image();
-    img.src = coinImgSrc;
-    coinImageRef.current = img;
+    const assets = [
+      { ref: coinImageRef, src: coinImgSrc },
+      { ref: bgImageRef, src: bgImage },
+      { ref: playerSpriteRef, src: playerSpriteSrc },
+      { ref: obstacleSpriteRef, src: obstacleSpriteSrc },
+    ];
 
-    const bgImg = new Image();
-    bgImg.src = bgImage;
-    bgImageRef.current = bgImg;
+    let loadedCount = 0;
 
-    const spriteImg = new Image();
-    spriteImg.src = playerSpriteSrc;
-    playerSpriteRef.current = spriteImg;
-
-    const obsImg = new Image();
-    obsImg.src = obstacleSpriteSrc;
-    obstacleSpriteRef.current = obsImg;
+    assets.forEach(({ ref, src }) => {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        loadedCount += 1;
+        if (loadedCount === assets.length) {
+          setIsLoading(false);
+        }
+      };
+      ref.current = img;
+    });
   }, []);
 
   useEffect(() => {
@@ -118,6 +125,8 @@ const App = () => {
   };
 
   useEffect(() => {
+    if (isLoading) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -234,7 +243,7 @@ const App = () => {
           }
         }
 
-        // Спавн препятствий сверху в открытом коридоре
+        // Спавн препятствий сверху (снижена скорость их падения)
         if (animTickRef.current % OBS_SPAWN_RATE === 0) {
           const minCorridorX = PROTRUSION_WALL + OBS_SIZE / 2;
           const maxCorridorX = CANVAS_WIDTH - PROTRUSION_WALL - OBS_SIZE / 2;
@@ -250,7 +259,7 @@ const App = () => {
           state.obstacles.push({
             x: spawnX,
             y: -OBS_SIZE,
-            speed: 6 + Math.random() * 3,
+            speed: 2.5 + Math.random() * 3, // Медленная и комфортная скорость
           });
         }
 
@@ -316,8 +325,6 @@ const App = () => {
       // 2. Стены
       state.segments.forEach((seg) => {
         ctx.fillStyle = '#2b2d42';
-        ctx.strokeStyle = '#4a4e69';
-        ctx.lineWidth = 2;
 
         ctx.fillRect(0, seg.y, seg.leftWidth, seg.height);
         ctx.strokeRect(0, seg.y, seg.leftWidth, seg.height);
@@ -348,7 +355,7 @@ const App = () => {
         }
       });
 
-      // 4. Летящие препятствия (развернуты на 90°)
+      // 4. Летящие препятствия
       const obsImg = obstacleSpriteRef.current;
       if (obsImg && obsImg.complete) {
         const obsFrameWidth = obsImg.naturalWidth / OBS_COLS;
@@ -409,7 +416,26 @@ const App = () => {
       canvas.removeEventListener('pointerdown', handleCanvasClick);
       cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [isLoading]);
+
+  if (isLoading) {
+    return (
+      <div style={{
+        width: CANVAS_WIDTH,
+        height: CANVAS_HEIGHT,
+        backgroundColor: '#121212',
+        color: '#ffffff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '24px',
+        fontWeight: 'bold',
+        fontFamily: 'sans-serif'
+      }}>
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: 'relative' }}>
@@ -423,41 +449,40 @@ const App = () => {
           cursor: 'pointer',
         }}
       />
-       {gameOver && (
+      {gameOver && (
         <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            fontSize: '24px',
-            fontWeight: 'bold',
-            color: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column',
-            gap: '5px',
-            backgroundColor: 'rgba(0, 0, 0, 0.5)'
-          }}>
-           <p>Game over</p>       
-           <p style={{
-            fontSize: '18px',
-          }}>{score} Huba Bubas</p>
-                  <button
-          onClick={restartGame}
-          style={{
-            padding: '12px 28px',
-            fontSize: '18px',
-            backgroundColor: '#2b2d42',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
-          }}
-        >
-          Restart
-        </button>
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          fontSize: '24px',
+          fontWeight: 'bold',
+          color: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: '5px',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)'
+        }}>
+          <p>Game over</p>        
+          <p style={{ fontSize: '18px' }}>{score} Huba Bubas</p>
+          <button
+            onClick={restartGame}
+            style={{
+              padding: '12px 28px',
+              fontSize: '18px',
+              backgroundColor: '#2b2d42',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
+            }}
+          >
+            Restart
+          </button>
         </div>
       )}
     </div>
