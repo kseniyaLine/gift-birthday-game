@@ -5,6 +5,7 @@ import playerSpriteSrc from './panda.png';
 import obstacleSpriteSrc from './wolf.png';
 import wallImgSrc from './wall-bg.avif';
 import magnetImgSrc from './magnit.png';
+import x2ImgSrc from './x2.jpg'; 
 
 // --- НАСТРОЙКИ ИГРОКА (4x4) ---
 const PLAYER_COLS = 4;
@@ -19,7 +20,7 @@ const OBS_TOTAL_FRAMES = 70;
 const OBS_ANIM_SPEED = 6;
 const OBS_SIZE = 40;
 const OBS_HITBOX_RADIUS = 16;
-const OBS_SPAWN_RATE = 240; 
+const OBS_SPAWN_RATE = 120; 
 
 const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
@@ -35,9 +36,14 @@ const COIN_HITBOX = 14;
 // --- НАСТРОЙКИ МАГНИТА ---
 const MAGNET_SIZE = 45;
 const MAGNET_HITBOX = 16;
-const MAGNET_DURATION = 10; // 10 секунд работы
-const MAGNET_PULL_SPEED = 10; // Скорость притягивания монеток
-const MAGNET_RADIUS = 180; // <-- Ограничение радиуса действия магнита
+const MAGNET_DURATION = 10;
+const MAGNET_PULL_SPEED = 10;
+const MAGNET_RADIUS = 180;
+
+// --- НАСТРОЙКИ Х2 ---
+const X2_SIZE = 45;
+const X2_HITBOX = 16;
+const X2_DURATION = 15;
 
 const App = () => {
   const canvasRef = useRef(null);
@@ -47,6 +53,7 @@ const App = () => {
   const obstacleSpriteRef = useRef(null);
   const wallImageRef = useRef(null);
   const magnetImageRef = useRef(null);
+  const x2ImageRef = useRef(null);
   
   const animTickRef = useRef(0);
   const lastTimeRef = useRef(0);
@@ -60,6 +67,7 @@ const App = () => {
     gameOver: false,
     score: 0,
     magnetTimer: 0,
+    x2Timer: 0,
     player: {
       y: 460,
       width: 32,
@@ -73,6 +81,7 @@ const App = () => {
     coins: [],
     obstacles: [],
     magnets: [],
+    x2Items: [],
   });
 
   // Загрузка изображений
@@ -84,6 +93,7 @@ const App = () => {
       { ref: obstacleSpriteRef, src: obstacleSpriteSrc },
       { ref: wallImageRef, src: wallImgSrc },
       { ref: magnetImageRef, src: magnetImgSrc },
+      { ref: x2ImageRef, src: x2ImgSrc },
     ];
 
     let loadedCount = 0;
@@ -126,6 +136,7 @@ const App = () => {
       gameOver: false,
       score: 0,
       magnetTimer: 0,
+      x2Timer: 0,
       player: {
         y: 460,
         width: 32,
@@ -139,6 +150,7 @@ const App = () => {
       coins: [],
       obstacles: [],
       magnets: [],
+      x2Items: [],
     };
 
     animTickRef.current = 0;
@@ -187,12 +199,21 @@ const App = () => {
 
       const delta = (currentTime - lastTimeRef.current) / 1000;
       lastTimeRef.current = currentTime;
-      const timeScale = Math.min(delta * 60, 2);
+      const baseTimeScale = Math.min(delta * 60, 2);
 
       const state = gameStateRef.current;
 
       if (!state.gameOver) {
         const player = state.player;
+
+        // Обработка таймера х2 и вычисление итоговой скорости игры
+        if (state.x2Timer > 0) {
+          state.x2Timer -= delta;
+          if (state.x2Timer < 0) state.x2Timer = 0;
+        }
+
+        const gameSpeedMultiplier = state.x2Timer > 0 ? 2 : 1;
+        const timeScale = baseTimeScale * gameSpeedMultiplier;
 
         // Обработка таймера магнита
         if (state.magnetTimer > 0) {
@@ -200,25 +221,24 @@ const App = () => {
           if (state.magnetTimer < 0) state.magnetTimer = 0;
         }
 
-        // Движение мира, монеток и магнитов
+        // Движение мира, монеток, магнитов и предметов x2
         state.segments.forEach((seg) => (seg.y += SCROLL_SPEED * timeScale));
         state.magnets.forEach((mag) => (mag.y += SCROLL_SPEED * timeScale));
+        state.x2Items.forEach((x2) => (x2.y += SCROLL_SPEED * timeScale));
         
         const playerCenterX = player.x + player.width / 2;
         const playerCenterY = player.y + player.height / 2;
 
-        // Логика монеток и их притягивание магнитом
+        // Логика монеток и притягивания
         state.coins.forEach((coin) => {
           coin.y += SCROLL_SPEED * timeScale;
           coin.angle += 0.08 * timeScale;
 
-          // Ограниченный эффект магнита
           if (state.magnetTimer > 0) {
             const dx = playerCenterX - coin.x;
             const dy = playerCenterY - coin.y;
             const dist = Math.hypot(dx, dy);
 
-            // Притягиваем только монеты в пределах MAGNET_RADIUS
             if (dist > 0 && dist <= MAGNET_RADIUS) {
               coin.x += (dx / dist) * MAGNET_PULL_SPEED * timeScale;
               coin.y += (dy / dist) * MAGNET_PULL_SPEED * timeScale;
@@ -264,7 +284,7 @@ const App = () => {
           }
         }
 
-        // Генерация новых секций, монеток и магнитов
+        // Генерация новых секций
         const topSegment = state.segments[state.segments.length - 1];
         if (topSegment && topSegment.y >= -SEGMENT_HEIGHT) {
           const newY = topSegment.y - SEGMENT_HEIGHT;
@@ -288,15 +308,23 @@ const App = () => {
           const freeLeft = leftW + 30;
           const freeRight = CANVAS_WIDTH - rightW - 30;
 
-          // Шанс на спавн магнита
-          if (Math.random() < 0.01) {
+          const itemRoll = Math.random();
+          if (itemRoll < 0.01) {
+            // Шанс на спавн магнита
             const magX = freeLeft + Math.random() * (freeRight - freeLeft);
             state.magnets.push({
               x: magX,
               y: newY + SEGMENT_HEIGHT / 2,
             });
-          } else if (Math.random() < 0.75) {
-            // Повышенный шанс спавна монеток (75%) + вариант двойного спавна
+          } else if (itemRoll < 0.02) {
+            // Шанс на спавн штучки X2
+            const x2X = freeLeft + Math.random() * (freeRight - freeLeft);
+            state.x2Items.push({
+              x: x2X,
+              y: newY + SEGMENT_HEIGHT / 2,
+            });
+          } else if (itemRoll < 0.75) {
+            // Спавн монеток
             const coinCount = Math.random() < 0.35 ? 2 : 1;
             for (let c = 0; c < coinCount; c++) {
               const coinX = freeLeft + Math.random() * (freeRight - freeLeft);
@@ -323,6 +351,22 @@ const App = () => {
             state.magnets.splice(i, 1);
           } else if (mag.y > CANVAS_HEIGHT) {
             state.magnets.splice(i, 1);
+          }
+        }
+
+        // Подбор x2
+        for (let i = state.x2Items.length - 1; i >= 0; i--) {
+          const x2 = state.x2Items[i];
+          if (
+            player.x < x2.x + X2_HITBOX &&
+            player.x + player.width > x2.x - X2_HITBOX &&
+            player.y < x2.y + X2_HITBOX &&
+            player.y + player.height > x2.y - X2_HITBOX
+          ) {
+            state.x2Timer = X2_DURATION;
+            state.x2Items.splice(i, 1);
+          } else if (x2.y > CANVAS_HEIGHT) {
+            state.x2Items.splice(i, 1);
           }
         }
 
@@ -436,7 +480,21 @@ const App = () => {
         }
       });
 
-      // 4. Монетки
+      // 4. Штучки х2 на карте
+      const x2Img = x2ImageRef.current;
+      state.x2Items.forEach((x2) => {
+        if (x2Img && x2Img.complete) {
+          ctx.drawImage(
+            x2Img,
+            x2.x - X2_SIZE / 2,
+            x2.y - X2_SIZE / 2,
+            X2_SIZE,
+            X2_SIZE
+          );
+        }
+      });
+
+      // 5. Монетки
       const coinImg = coinImageRef.current;
       state.coins.forEach((coin) => {
         if (!coin.collected) {
@@ -458,7 +516,7 @@ const App = () => {
         }
       });
 
-      // 5. Летящие препятствия
+      // 6. Летящие препятствия
       const obsImg = obstacleSpriteRef.current;
       if (obsImg && obsImg.complete) {
         const obsFrameWidth = obsImg.naturalWidth / OBS_COLS;
@@ -484,7 +542,7 @@ const App = () => {
         });
       }
 
-      // 6. Игрок
+      // 7. Игрок
       const p = state.player;
       const spriteImg = playerSpriteRef.current;
 
@@ -514,6 +572,7 @@ const App = () => {
         );
       }
       ctx.restore();
+
       animationFrameId = requestAnimationFrame(render);
     };
 
