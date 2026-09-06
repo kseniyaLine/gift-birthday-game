@@ -1,6 +1,23 @@
 import React, { useRef, useEffect, useState } from 'react';
 import bgImage from './background.png';
 import coinImgSrc from './coin.png'; 
+import playerSpriteSrc from './panda.png';
+import obstacleSpriteSrc from './wolf.png';
+
+// --- НАСТРОЙКИ ИГРОКА (4x4) ---
+const PLAYER_COLS = 4;
+const PLAYER_ROWS = 4;
+const PLAYER_TOTAL_FRAMES = 15;
+const PLAYER_ANIM_SPEED = 4;
+
+// --- НАСТРОЙКИ ПРЕПЯТСТВИЯ (8x9, 70 кадров) ---
+const OBS_ROWS = 8;
+const OBS_COLS = 9;
+const OBS_TOTAL_FRAMES = 70;
+const OBS_ANIM_SPEED = 2;
+const OBS_SIZE = 40;
+const OBS_HITBOX_RADIUS = 16;
+const OBS_SPAWN_RATE = 120; // Увеличено: спавн реже (каждые ~2 секунды)
 
 const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
@@ -11,12 +28,16 @@ const JUMP_SPEED = 14;
 const SCROLL_SPEED = 3;
 
 const COIN_SIZE = 32;
-const COIN_HITBOX = 14; // Радиус зоны подбора
+const COIN_HITBOX = 14;
 
 const App = () => {
   const canvasRef = useRef(null);
   const coinImageRef = useRef(null);
-  const bgImageRef = useRef(null)
+  const bgImageRef = useRef(null);
+  const playerSpriteRef = useRef(null);
+  const obstacleSpriteRef = useRef(null);
+  const animTickRef = useRef(0);
+
   const [isPaused, setIsPaused] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
@@ -27,8 +48,8 @@ const App = () => {
     score: 0,
     player: {
       y: 460,
-      width: 24,
-      height: 24,
+      width: 32,
+      height: 32,
       x: 60,
       side: 'left',
       isJumping: false,
@@ -36,9 +57,9 @@ const App = () => {
     },
     segments: [],
     coins: [],
+    obstacles: [],
   });
 
-  // Предзагрузка изображения монетки при монтировании
   useEffect(() => {
     const img = new Image();
     img.src = coinImgSrc;
@@ -47,6 +68,14 @@ const App = () => {
     const bgImg = new Image();
     bgImg.src = bgImage;
     bgImageRef.current = bgImg;
+
+    const spriteImg = new Image();
+    spriteImg.src = playerSpriteSrc;
+    playerSpriteRef.current = spriteImg;
+
+    const obsImg = new Image();
+    obsImg.src = obstacleSpriteSrc;
+    obstacleSpriteRef.current = obsImg;
   }, []);
 
   useEffect(() => {
@@ -70,8 +99,8 @@ const App = () => {
       score: 0,
       player: {
         y: 460,
-        width: 24,
-        height: 24,
+        width: 32,
+        height: 32,
         x: BASE_WALL,
         side: 'left',
         isJumping: false,
@@ -79,8 +108,10 @@ const App = () => {
       },
       segments: initialSegments,
       coins: [],
+      obstacles: [],
     };
 
+    animTickRef.current = 0;
     setScore(0);
     setGameOver(false);
     setIsPaused(false);
@@ -124,12 +155,16 @@ const App = () => {
       if (!state.isPaused && !state.gameOver) {
         const player = state.player;
 
+        // Движение мира и монеток
         state.segments.forEach((seg) => (seg.y += SCROLL_SPEED));
-        
-        // Обновляем позицию и угол вращения каждой монетки
         state.coins.forEach((coin) => {
           coin.y += SCROLL_SPEED;
-          coin.angle += 0.08; // Скорость вращения
+          coin.angle += 0.08;
+        });
+
+        // Полет препятствий сверху вниз
+        state.obstacles.forEach((obs) => {
+          obs.y += obs.speed;
         });
 
         const currentSeg = state.segments.find(
@@ -138,6 +173,7 @@ const App = () => {
         const currentLeftW = currentSeg ? currentSeg.leftWidth : BASE_WALL;
         const currentRightW = currentSeg ? currentSeg.rightWidth : BASE_WALL;
 
+        // Перемещение игрока
         if (player.isJumping) {
           player.x += player.vx;
 
@@ -164,6 +200,7 @@ const App = () => {
           }
         }
 
+        // Генерация новых секций и монеток
         const topSegment = state.segments[state.segments.length - 1];
         if (topSegment && topSegment.y >= -SEGMENT_HEIGHT) {
           const newY = topSegment.y - SEGMENT_HEIGHT;
@@ -184,24 +221,44 @@ const App = () => {
             rightWidth: rightW,
           });
 
-          if (Math.random() < 0.6) {
+          if (Math.random() < 0.5) {
             const freeLeft = leftW + 30;
             const freeRight = CANVAS_WIDTH - rightW - 30;
             const coinX = freeLeft + Math.random() * (freeRight - freeLeft);
             state.coins.push({
               x: coinX,
               y: newY + SEGMENT_HEIGHT / 2,
-              angle: Math.random() * Math.PI * 2, // Случайный начальный угол
+              angle: Math.random() * Math.PI * 2,
               collected: false,
             });
           }
+        }
+
+        // Спавн препятствий сверху в открытом коридоре
+        if (animTickRef.current % OBS_SPAWN_RATE === 0) {
+          const minCorridorX = PROTRUSION_WALL + OBS_SIZE / 2;
+          const maxCorridorX = CANVAS_WIDTH - PROTRUSION_WALL - OBS_SIZE / 2;
+
+          let spawnX;
+          if (Math.random() < 0.4) {
+            const playerCenterX = player.x + player.width / 2;
+            spawnX = Math.min(Math.max(playerCenterX, minCorridorX), maxCorridorX);
+          } else {
+            spawnX = minCorridorX + Math.random() * (maxCorridorX - minCorridorX);
+          }
+
+          state.obstacles.push({
+            x: spawnX,
+            y: -OBS_SIZE,
+            speed: 6 + Math.random() * 3,
+          });
         }
 
         if (state.segments[0] && state.segments[0].y > CANVAS_HEIGHT) {
           state.segments.shift();
         }
 
-        // Проверка столкновений с монеткой
+        // Сбор монеток
         for (let i = state.coins.length - 1; i >= 0; i--) {
           const coin = state.coins[i];
           if (
@@ -219,25 +276,44 @@ const App = () => {
             state.coins.splice(i, 1);
           }
         }
+
+        // Столкновение с препятствием (Game Over)
+        const playerCenterX = player.x + player.width / 2;
+        const playerCenterY = player.y + player.height / 2;
+
+        for (let i = state.obstacles.length - 1; i >= 0; i--) {
+          const obs = state.obstacles[i];
+          const dist = Math.hypot(playerCenterX - obs.x, playerCenterY - obs.y);
+
+          if (dist < OBS_HITBOX_RADIUS + player.width / 3) {
+            state.gameOver = true;
+            setGameOver(true);
+            break;
+          }
+
+          if (obs.y > CANVAS_HEIGHT + OBS_SIZE) {
+            state.obstacles.splice(i, 1);
+          }
+        }
+
+        animTickRef.current += 1;
       }
 
       // --- ОТРИСОВКА ---
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-      // 1. Отрисовка фона
+      // 1. Фон
       const bgImg = bgImageRef.current;
       if (bgImg && bgImg.complete) {
         ctx.drawImage(bgImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-        // Затемнение поверх фона
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       } else {
-        // Темный цвет по умолчанию, пока картинка загружается
         ctx.fillStyle = '#121212';
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       }
 
-      // Отрисовка серых стен
+      // 2. Стены
       state.segments.forEach((seg) => {
         ctx.fillStyle = '#2b2d42';
         ctx.strokeStyle = '#4a4e69';
@@ -250,15 +326,12 @@ const App = () => {
         ctx.strokeRect(CANVAS_WIDTH - seg.rightWidth, seg.y, seg.rightWidth, seg.height);
       });
 
-      // Отрисовка монеток-картинок с вращением
+      // 3. Монетки
       const coinImg = coinImageRef.current;
       state.coins.forEach((coin) => {
         if (!coin.collected) {
           ctx.save();
-          // Переносим точку отсчета в центр монетки
           ctx.translate(coin.x, coin.y);
-
-          // Вращение вокруг вертикальной оси Y (сжатие по X создает эффект 3D-вращения)
           const scaleX = Math.cos(coin.angle);
           ctx.scale(scaleX, 1);
 
@@ -275,10 +348,63 @@ const App = () => {
         }
       });
 
-      // Отрисовка игрока
-      ctx.fillStyle = state.gameOver ? '#d90429' : '#00f5d4';
-      ctx.fillRect(state.player.x, state.player.y, state.player.width, state.player.height);
+      // 4. Летящие препятствия (развернуты на 90°)
+      const obsImg = obstacleSpriteRef.current;
+      if (obsImg && obsImg.complete) {
+        const obsFrameWidth = obsImg.naturalWidth / OBS_COLS;
+        const obsFrameHeight = obsImg.naturalHeight / OBS_ROWS;
 
+        const currentObsFrame = Math.floor(animTickRef.current / OBS_ANIM_SPEED) % OBS_TOTAL_FRAMES;
+        const obsCol = currentObsFrame % OBS_COLS;
+        const obsRow = Math.floor(currentObsFrame / OBS_COLS);
+
+        const obsSx = obsCol * obsFrameWidth;
+        const obsSy = obsRow * obsFrameHeight;
+
+        state.obstacles.forEach((obs) => {
+          ctx.save();
+          ctx.translate(obs.x, obs.y);
+          ctx.rotate((-90 * Math.PI) / 180); // Поворот спрайта на 90 градусов
+          ctx.drawImage(
+            obsImg,
+            obsSx, obsSy, obsFrameWidth, obsFrameHeight,
+            -OBS_SIZE / 2, -OBS_SIZE / 2, OBS_SIZE, OBS_SIZE
+          );
+          ctx.restore();
+        });
+      }
+
+      // 5. Игрок
+      const p = state.player;
+      const spriteImg = playerSpriteRef.current;
+
+      ctx.save();
+      ctx.translate(p.x + p.width / 2, p.y + p.height / 2);
+      ctx.rotate((90 * Math.PI) / 180);
+
+      if (spriteImg && spriteImg.complete) {
+        const frameWidth = spriteImg.naturalWidth / PLAYER_COLS;
+        const frameHeight = spriteImg.naturalHeight / PLAYER_ROWS;
+
+        const currentFrame = Math.floor(animTickRef.current / PLAYER_ANIM_SPEED) % PLAYER_TOTAL_FRAMES;
+        const col = currentFrame % PLAYER_COLS;
+        const row = Math.floor(currentFrame / PLAYER_COLS);
+
+        const sx = col * frameWidth;
+        const sy = row * frameHeight;
+
+        ctx.drawImage(
+          spriteImg,
+          sx, sy, frameWidth, frameHeight,
+          -p.width / 2, -p.height / 2, p.width, p.height
+        );
+      } else {
+        ctx.fillStyle = state.gameOver ? '#d90429' : '#00f5d4';
+        ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+      }
+      ctx.restore();
+
+      // 6. Game Over
       if (state.gameOver) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
