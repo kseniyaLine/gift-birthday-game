@@ -3,6 +3,7 @@ import bgImage from './background.png';
 import coinImgSrc from './coin.png'; 
 import playerSpriteSrc from './panda.png';
 import obstacleSpriteSrc from './wolf.png';
+import wallImgSrc from './wall-bg.avif';
 
 // --- НАСТРОЙКИ ИГРОКА (4x4) ---
 const PLAYER_COLS = 4;
@@ -36,6 +37,7 @@ const App = () => {
   const bgImageRef = useRef(null);
   const playerSpriteRef = useRef(null);
   const obstacleSpriteRef = useRef(null);
+  const wallImageRef = useRef(null);
   const animTickRef = useRef(0);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -66,6 +68,7 @@ const App = () => {
       { ref: bgImageRef, src: bgImage },
       { ref: playerSpriteRef, src: playerSpriteSrc },
       { ref: obstacleSpriteRef, src: obstacleSpriteSrc },
+      { ref: wallImageRef, src: wallImgSrc },
     ];
 
     let loadedCount = 0;
@@ -325,8 +328,13 @@ const App = () => {
       }
 
       // 2. Стены
+      const wallImg = wallImageRef.current;
       state.segments.forEach((seg) => {
-        ctx.fillStyle = '#2b2d42';
+        if (wallImg && wallImg.complete) {
+          ctx.drawImage(wallImg, 0, seg.y, seg.leftWidth, seg.height);
+          ctx.drawImage(wallImg, CANVAS_WIDTH - seg.rightWidth, seg.y, seg.rightWidth, seg.height);
+        } else {
+             ctx.fillStyle = '#2b2d42';
         ctx.lineWidth = 2;
 
         ctx.fillRect(0, seg.y, seg.leftWidth, seg.height);
@@ -334,7 +342,7 @@ const App = () => {
 
         ctx.fillRect(CANVAS_WIDTH - seg.rightWidth, seg.y, seg.rightWidth, seg.height);
         ctx.strokeRect(CANVAS_WIDTH - seg.rightWidth, seg.y, seg.rightWidth, seg.height);
-      });
+    }})
 
       // 3. Монетки
       const coinImg = coinImageRef.current;
@@ -390,7 +398,10 @@ const App = () => {
 
       ctx.save();
       ctx.translate(p.x + p.width / 2, p.y + p.height / 2);
-      ctx.rotate((90 * Math.PI) / 180);
+      if(p.side === 'right') {
+        ctx.rotate((-90 * Math.PI) / 180);
+      } else ctx.rotate((90 * Math.PI) / 180);
+      
 
       if (spriteImg && spriteImg.complete) {
         const frameWidth = spriteImg.naturalWidth / PLAYER_COLS;
@@ -445,9 +456,6 @@ const App = () => {
       <canvas
         ref={canvasRef}
         style={{
-          border: '3px solid #333',
-          borderRadius: '12px',
-          backgroundColor: '#121212',
           touchAction: 'none',
           cursor: 'pointer',
         }}
