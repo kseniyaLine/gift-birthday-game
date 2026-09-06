@@ -364,7 +364,7 @@ const App = () => {
         state.obstacles.forEach((obs) => {
           ctx.save();
           ctx.translate(obs.x, obs.y);
-          ctx.rotate((-90 * Math.PI) / 180); // Поворот спрайта на 90 градусов
+          ctx.rotate((-90 * Math.PI) / 180);
           ctx.drawImage(
             obsImg,
             obsSx, obsSy, obsFrameWidth, obsFrameHeight,
@@ -430,6 +430,7 @@ const App = () => {
   }, []);
 
   return (
+    <div style={{ position: 'relative', width: CANVAS_WIDTH, height: CANVAS_HEIGHT, display: 'inline-block' }}>
       <canvas
         ref={canvasRef}
         style={{
@@ -440,6 +441,29 @@ const App = () => {
           cursor: 'pointer',
         }}
       />
+      {gameOver && (
+        <button
+          onClick={restartGame}
+          style={{
+            position: 'absolute',
+            top: 'calc(50% + 60px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: '12px 28px',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            color: '#ffffff',
+            backgroundColor: '#00f5d4',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
+          }}
+        >
+          Restart
+        </button>
+      )}
+    </div>
   );
 };
 
