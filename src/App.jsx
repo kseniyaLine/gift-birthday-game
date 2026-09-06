@@ -398,26 +398,8 @@ const App = () => {
           sx, sy, frameWidth, frameHeight,
           -p.width / 2, -p.height / 2, p.width, p.height
         );
-      } else {
-        ctx.fillStyle = state.gameOver ? '#d90429' : '#00f5d4';
-        ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
       }
       ctx.restore();
-
-      // 6. Game Over
-      if (state.gameOver) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 24px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('ИГРА ОКОНЧЕНА', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
-
-        ctx.font = '16px sans-serif';
-        ctx.fillText(`Счет: ${state.score}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 15);
-      }
-
       animationFrameId = requestAnimationFrame(render);
     };
 
@@ -430,7 +412,7 @@ const App = () => {
   }, []);
 
   return (
-    <div style={{ position: 'relative', width: CANVAS_WIDTH, height: CANVAS_HEIGHT, display: 'inline-block' }}>
+    <div style={{ position: 'relative' }}>
       <canvas
         ref={canvasRef}
         style={{
@@ -441,19 +423,33 @@ const App = () => {
           cursor: 'pointer',
         }}
       />
-      {gameOver && (
-        <button
-          onClick={restartGame}
-          style={{
+       {gameOver && (
+        <div style={{
             position: 'absolute',
-            top: 'calc(50% + 60px)',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            padding: '12px 28px',
-            fontSize: '18px',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            fontSize: '24px',
             fontWeight: 'bold',
             color: '#ffffff',
-            backgroundColor: '#00f5d4',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: '5px',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)'
+          }}>
+           <p>Game over</p>       
+           <p style={{
+            fontSize: '18px',
+          }}>{score} Huba Bubas</p>
+                  <button
+          onClick={restartGame}
+          style={{
+            padding: '12px 28px',
+            fontSize: '18px',
+            backgroundColor: '#2b2d42',
             border: 'none',
             borderRadius: '8px',
             cursor: 'pointer',
@@ -462,6 +458,7 @@ const App = () => {
         >
           Restart
         </button>
+        </div>
       )}
     </div>
   );
