@@ -20,7 +20,7 @@ const OBS_TOTAL_FRAMES = 70;
 const OBS_ANIM_SPEED = 6;
 const OBS_SIZE = 40;
 const OBS_HITBOX_RADIUS = 16;
-const OBS_SPAWN_RATE = 120; 
+const OBS_SPAWN_RATE = 95; 
 
 const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
