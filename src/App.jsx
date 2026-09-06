@@ -43,7 +43,7 @@ const MAGNET_RADIUS = 180;
 // --- НАСТРОЙКИ Х2 ---
 const X2_SIZE = 45;
 const X2_HITBOX = 16;
-const X2_DURATION = 15;
+const X2_DURATION = 10;
 
 const App = () => {
   const canvasRef = useRef(null);
@@ -316,7 +316,7 @@ const App = () => {
               x: magX,
               y: newY + SEGMENT_HEIGHT / 2,
             });
-          } else if (itemRoll < 0.02) {
+          } else if (itemRoll < 0.011) {
             // Шанс на спавн штучки X2
             const x2X = freeLeft + Math.random() * (freeRight - freeLeft);
             state.x2Items.push({
