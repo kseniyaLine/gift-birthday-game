@@ -10,13 +10,13 @@ import magnetImgSrc from './magnit.png';
 const PLAYER_COLS = 4;
 const PLAYER_ROWS = 4;
 const PLAYER_TOTAL_FRAMES = 15;
-const PLAYER_ANIM_SPEED = 5;
+const PLAYER_ANIM_SPEED = 6;
 
 // --- НАСТРОЙКИ ПРЕПЯТСТВИЯ (8x9, 70 кадров) ---
 const OBS_ROWS = 8;
 const OBS_COLS = 9;
 const OBS_TOTAL_FRAMES = 70;
-const OBS_ANIM_SPEED = 5;
+const OBS_ANIM_SPEED = 6;
 const OBS_SIZE = 40;
 const OBS_HITBOX_RADIUS = 16;
 const OBS_SPAWN_RATE = 240; 
@@ -27,7 +27,7 @@ const BASE_WALL = 60;
 const PROTRUSION_WALL = 90;
 const SEGMENT_HEIGHT = 60;
 const JUMP_SPEED = 14;
-const SCROLL_SPEED = 4;
+const SCROLL_SPEED = 5;
 
 const COIN_SIZE = 32;
 const COIN_HITBOX = 14;
