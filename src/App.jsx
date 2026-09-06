@@ -22,8 +22,8 @@ const OBS_SPAWN_RATE = 240; // Увеличено: спавн реже (кажд
 const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
 const BASE_WALL = 60;
-const PROTRUSION_WALL = 90;
-const SEGMENT_HEIGHT = 80;
+const PROTRUSION_WALL = 65;
+const SEGMENT_HEIGHT = 60;
 const JUMP_SPEED = 14;
 const SCROLL_SPEED = 3;
 
