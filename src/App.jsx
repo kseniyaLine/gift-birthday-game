@@ -22,10 +22,10 @@ const OBS_SPAWN_RATE = 240; // Увеличено: спавн реже (кажд
 const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
 const BASE_WALL = 60;
-const PROTRUSION_WALL = 65;
+const PROTRUSION_WALL = 90;
 const SEGMENT_HEIGHT = 60;
 const JUMP_SPEED = 14;
-const SCROLL_SPEED = 3;
+const SCROLL_SPEED = 2;
 
 const COIN_SIZE = 32;
 const COIN_HITBOX = 14;
@@ -430,12 +430,6 @@ const App = () => {
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontFamily: 'sans-serif' }}>
-      <h2>Ninja Maze Runner</h2>
-      <div style={{ marginBottom: 10, fontWeight: 'bold', fontSize: '18px' }}>
-        💰 Монеты / Счет: {score}
-      </div>
-
       <canvas
         ref={canvasRef}
         style={{
@@ -446,43 +440,6 @@ const App = () => {
           cursor: 'pointer',
         }}
       />
-
-      <div style={{ marginTop: 15, display: 'flex', gap: '10px' }}>
-        {gameOver ? (
-          <button
-            onClick={restartGame}
-            style={{
-              padding: '12px 24px',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              backgroundColor: '#00f5d4',
-              color: '#000',
-              border: 'none',
-              borderRadius: '8px',
-            }}
-          >
-            🔄 Начать заново
-          </button>
-        ) : (
-          <button
-            onClick={() => setIsPaused((prev) => !prev)}
-            style={{
-              padding: '12px 24px',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              backgroundColor: isPaused ? '#2a9d8f' : '#e76f51',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-            }}
-          >
-            {isPaused ? '▶ Продолжить' : '⏸ Пауза'}
-          </button>
-        )}
-      </div>
-    </div>
   );
 };
 
