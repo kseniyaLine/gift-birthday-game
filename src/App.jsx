@@ -39,12 +39,10 @@ const App = () => {
   const animTickRef = useRef(0);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
 
   const gameStateRef = useRef({
-    isPaused: false,
     gameOver: false,
     score: 0,
     player: {
@@ -95,10 +93,6 @@ const App = () => {
     });
   }, []);
 
-  useEffect(() => {
-    gameStateRef.current.isPaused = isPaused;
-  }, [isPaused]);
-
   const restartGame = () => {
     const initialSegments = [];
     for (let i = 0; i < 8; i++) {
@@ -111,7 +105,6 @@ const App = () => {
     }
 
     gameStateRef.current = {
-      isPaused: false,
       gameOver: false,
       score: 0,
       player: {
@@ -131,7 +124,6 @@ const App = () => {
     animTickRef.current = 0;
     setScore(0);
     setGameOver(false);
-    setIsPaused(false);
   };
 
   useEffect(() => {
@@ -151,7 +143,7 @@ const App = () => {
     const handleCanvasClick = (e) => {
       e.preventDefault();
       const state = gameStateRef.current;
-      if (state.isPaused || state.gameOver) return;
+      if (state.gameOver) return;
 
       const { player } = state;
       if (!player.isJumping) {
@@ -171,7 +163,7 @@ const App = () => {
     const render = () => {
       const state = gameStateRef.current;
 
-      if (!state.isPaused && !state.gameOver) {
+      if (!state.gameOver) {
         const player = state.player;
 
         // Движение мира и монеток
