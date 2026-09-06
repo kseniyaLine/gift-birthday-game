@@ -28,7 +28,7 @@ const BASE_WALL = 60;
 const PROTRUSION_WALL = 90;
 const SEGMENT_HEIGHT = 60;
 const JUMP_SPEED = 14;
-const SCROLL_SPEED = 5;
+const TARGET_SCROLL_SPEED = 5;
 
 const COIN_SIZE = 32;
 const COIN_HITBOX = 14;
@@ -66,13 +66,14 @@ const App = () => {
   const gameStateRef = useRef({
     gameOver: false,
     score: 0,
+    gameTime: 0,
     magnetTimer: 0,
     x2Timer: 0,
     player: {
       y: 460,
       width: 32,
       height: 32,
-      x: 60,
+      x: BASE_WALL,
       side: 'left',
       isJumping: false,
       vx: 0,
@@ -84,7 +85,6 @@ const App = () => {
     x2Items: [],
   });
 
-  // Загрузка изображений
   useEffect(() => {
     const assets = [
       { ref: coinImageRef, src: coinImgSrc },
@@ -135,6 +135,7 @@ const App = () => {
     gameStateRef.current = {
       gameOver: false,
       score: 0,
+      gameTime: 0,
       magnetTimer: 0,
       x2Timer: 0,
       player: {
@@ -204,9 +205,11 @@ const App = () => {
       const state = gameStateRef.current;
 
       if (!state.gameOver) {
+        state.gameTime += delta;
+        
+        const currentScrollSpeed = Math.min(TARGET_SCROLL_SPEED, 2.0 + state.gameTime * 0.6);
         const player = state.player;
 
-        // Обработка таймера х2 и вычисление итоговой скорости игры
         if (state.x2Timer > 0) {
           state.x2Timer -= delta;
           if (state.x2Timer < 0) state.x2Timer = 0;
@@ -215,23 +218,22 @@ const App = () => {
         const gameSpeedMultiplier = state.x2Timer > 0 ? 2 : 1;
         const timeScale = baseTimeScale * gameSpeedMultiplier;
 
-        // Обработка таймера магнита
         if (state.magnetTimer > 0) {
           state.magnetTimer -= delta;
           if (state.magnetTimer < 0) state.magnetTimer = 0;
         }
 
-        // Движение мира, монеток, магнитов и предметов x2
-        state.segments.forEach((seg) => (seg.y += SCROLL_SPEED * timeScale));
-        state.magnets.forEach((mag) => (mag.y += SCROLL_SPEED * timeScale));
-        state.x2Items.forEach((x2) => (x2.y += SCROLL_SPEED * timeScale));
+        const stepMovement = currentScrollSpeed * timeScale;
+
+        state.segments.forEach((seg) => (seg.y += stepMovement));
+        state.magnets.forEach((mag) => (mag.y += stepMovement));
+        state.x2Items.forEach((x2) => (x2.y += stepMovement));
         
         const playerCenterX = player.x + player.width / 2;
         const playerCenterY = player.y + player.height / 2;
 
-        // Логика монеток и притягивания
         state.coins.forEach((coin) => {
-          coin.y += SCROLL_SPEED * timeScale;
+          coin.y += stepMovement;
           coin.angle += 0.08 * timeScale;
 
           if (state.magnetTimer > 0) {
@@ -246,9 +248,8 @@ const App = () => {
           }
         });
 
-        // Полет препятствий
         state.obstacles.forEach((obs) => {
-          obs.y += (SCROLL_SPEED + obs.speed) * timeScale;
+          obs.y += (currentScrollSpeed + obs.speed) * timeScale;
         });
 
         const currentSeg = state.segments.find(
@@ -257,7 +258,6 @@ const App = () => {
         const currentLeftW = currentSeg ? currentSeg.leftWidth : BASE_WALL;
         const currentRightW = currentSeg ? currentSeg.rightWidth : BASE_WALL;
 
-        // Перемещение игрока
         if (player.isJumping) {
           player.x += player.vx * timeScale;
 
@@ -292,7 +292,7 @@ const App = () => {
           let leftW = BASE_WALL;
           let rightW = BASE_WALL;
 
-          if (rand < 0.35) {
+          if (rand < 0.4) {
             leftW = PROTRUSION_WALL;
           } else if (rand < 0.7) {
             rightW = PROTRUSION_WALL;
@@ -310,21 +310,18 @@ const App = () => {
 
           const itemRoll = Math.random();
           if (itemRoll < 0.01) {
-            // Шанс на спавн магнита
             const magX = freeLeft + Math.random() * (freeRight - freeLeft);
             state.magnets.push({
               x: magX,
               y: newY + SEGMENT_HEIGHT / 2,
             });
-          } else if (itemRoll < 0.018) {
-            // Шанс на спавн штучки X2
+          } else if (itemRoll < 0.02) {
             const x2X = freeLeft + Math.random() * (freeRight - freeLeft);
             state.x2Items.push({
               x: x2X,
               y: newY + SEGMENT_HEIGHT / 2,
             });
           } else if (itemRoll < 0.75) {
-            // Спавн монеток
             const coinCount = Math.random() < 0.35 ? 2 : 1;
             for (let c = 0; c < coinCount; c++) {
               const coinX = freeLeft + Math.random() * (freeRight - freeLeft);
@@ -370,7 +367,7 @@ const App = () => {
           }
         }
 
-        // Таймер спавна препятствий
+        // Спавн летящих препятствий
         spawnTimerRef.current += timeScale;
         if (spawnTimerRef.current >= OBS_SPAWN_RATE) {
           spawnTimerRef.current %= OBS_SPAWN_RATE;
@@ -415,7 +412,7 @@ const App = () => {
           }
         }
 
-        // Столкновение с препятствием
+        // Столкновение с летящим препятствием
         for (let i = state.obstacles.length - 1; i >= 0; i--) {
           const obs = state.obstacles[i];
           const dist = Math.hypot(playerCenterX - obs.x, playerCenterY - obs.y);
@@ -437,7 +434,6 @@ const App = () => {
       // --- ОТРИСОВКА ---
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-      // 1. Фон
       const bgImg = bgImageRef.current;
       if (bgImg && bgImg.complete) {
         ctx.drawImage(bgImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -448,7 +444,6 @@ const App = () => {
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       }
 
-      // 2. Стены
       const wallImg = wallImageRef.current;
       state.segments.forEach((seg) => {
         if (wallImg && wallImg.complete) {
@@ -466,7 +461,6 @@ const App = () => {
         }
       });
 
-      // 3. Магниты на карте
       const magnetImg = magnetImageRef.current;
       state.magnets.forEach((mag) => {
         if (magnetImg && magnetImg.complete) {
@@ -480,7 +474,6 @@ const App = () => {
         }
       });
 
-      // 4. Штучки х2 на карте
       const x2Img = x2ImageRef.current;
       state.x2Items.forEach((x2) => {
         if (x2Img && x2Img.complete) {
@@ -494,7 +487,6 @@ const App = () => {
         }
       });
 
-      // 5. Монетки
       const coinImg = coinImageRef.current;
       state.coins.forEach((coin) => {
         if (!coin.collected) {
@@ -516,7 +508,6 @@ const App = () => {
         }
       });
 
-      // 6. Летящие препятствия
       const obsImg = obstacleSpriteRef.current;
       if (obsImg && obsImg.complete) {
         const obsFrameWidth = obsImg.naturalWidth / OBS_COLS;
@@ -542,7 +533,6 @@ const App = () => {
         });
       }
 
-      // 7. Игрок
       const p = state.player;
       const spriteImg = playerSpriteRef.current;
 
