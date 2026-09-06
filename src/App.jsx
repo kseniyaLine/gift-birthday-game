@@ -316,7 +316,7 @@ const App = () => {
               x: magX,
               y: newY + SEGMENT_HEIGHT / 2,
             });
-          } else if (itemRoll < 0.011) {
+          } else if (itemRoll < 0.018) {
             // Шанс на спавн штучки X2
             const x2X = freeLeft + Math.random() * (freeRight - freeLeft);
             state.x2Items.push({
