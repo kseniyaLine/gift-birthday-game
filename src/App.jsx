@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import bgImage from './background.png';
 import coinImgSrc from './coin.png'; 
 import playerSpriteSrc from './panda.png';
@@ -14,16 +14,16 @@ const PLAYER_ANIM_SPEED = 4;
 const OBS_ROWS = 8;
 const OBS_COLS = 9;
 const OBS_TOTAL_FRAMES = 70;
-const OBS_ANIM_SPEED = 2;
+const OBS_ANIM_SPEED = 1.5;
 const OBS_SIZE = 40;
 const OBS_HITBOX_RADIUS = 16;
-const OBS_SPAWN_RATE = 120; // Увеличено: спавн реже (каждые ~2 секунды)
+const OBS_SPAWN_RATE = 240; // Увеличено: спавн реже (каждые ~4 секунды)
 
 const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
 const BASE_WALL = 60;
-const PROTRUSION_WALL = 110;
-const SEGMENT_HEIGHT = 100;
+const PROTRUSION_WALL = 90;
+const SEGMENT_HEIGHT = 80;
 const JUMP_SPEED = 14;
 const SCROLL_SPEED = 3;
 
