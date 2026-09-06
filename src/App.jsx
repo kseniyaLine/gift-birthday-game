@@ -228,7 +228,7 @@ const App = () => {
 
         // Полет препятствий
         state.obstacles.forEach((obs) => {
-          obs.y += obs.speed * timeScale;
+          obs.y += (SCROLL_SPEED + obs.speed) * timeScale;
         });
 
         const currentSeg = state.segments.find(
