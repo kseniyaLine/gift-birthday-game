@@ -26,8 +26,9 @@ const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
 const BASE_WALL = 60;
 const PROTRUSION_WALL = 90;
+const PROTRUSION_WALL_2 = 110;
 const SEGMENT_HEIGHT = 60;
-const JUMP_SPEED = 14;
+const JUMP_SPEED = 11;
 const TARGET_SCROLL_SPEED = 5;
 
 const COIN_SIZE = 32;
@@ -54,7 +55,7 @@ const App = () => {
   const wallImageRef = useRef(null);
   const magnetImageRef = useRef(null);
   const x2ImageRef = useRef(null);
-  
+
   const animTickRef = useRef(0);
   const lastTimeRef = useRef(0);
   const spawnTimerRef = useRef(0);
@@ -62,6 +63,7 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
+  const [isX2Active, setIsX2Active] = useState(false);
 
   const gameStateRef = useRef({
     gameOver: false,
@@ -69,10 +71,14 @@ const App = () => {
     gameTime: 0,
     magnetTimer: 0,
     x2Timer: 0,
+    protrusionLeftCount: 0,
+    protrusionLeftWidth: BASE_WALL,
+    protrusionRightCount: 0,
+    protrusionRightWidth: BASE_WALL,
     player: {
       y: 460,
-      width: 32,
-      height: 32,
+      width: 42,
+      height: 42,
       x: BASE_WALL,
       side: 'left',
       isJumping: false,
@@ -138,10 +144,14 @@ const App = () => {
       gameTime: 0,
       magnetTimer: 0,
       x2Timer: 0,
+      protrusionLeftCount: 0,
+      protrusionLeftWidth: BASE_WALL,
+      protrusionRightCount: 0,
+      protrusionRightWidth: BASE_WALL,
       player: {
         y: 460,
-        width: 32,
-        height: 32,
+        width: 42,
+        height: 42,
         x: BASE_WALL,
         side: 'left',
         isJumping: false,
@@ -158,6 +168,7 @@ const App = () => {
     spawnTimerRef.current = 0;
     lastTimeRef.current = performance.now();
     setScore(0);
+    setIsX2Active(false);
     setGameOver(false);
   };
 
@@ -206,17 +217,19 @@ const App = () => {
 
       if (!state.gameOver) {
         state.gameTime += delta;
-        
-        const currentScrollSpeed = Math.min(TARGET_SCROLL_SPEED, 2.0 + state.gameTime * 0.6);
+
+        const currentScrollSpeed = Math.min(TARGET_SCROLL_SPEED, 0.5 + state.gameTime * 0.6);
         const player = state.player;
 
         if (state.x2Timer > 0) {
           state.x2Timer -= delta;
-          if (state.x2Timer < 0) state.x2Timer = 0;
+          if (state.x2Timer <= 0) {
+            state.x2Timer = 0;
+            setIsX2Active(false);
+          }
         }
 
-        const gameSpeedMultiplier = state.x2Timer > 0 ? 2 : 1;
-        const timeScale = baseTimeScale * gameSpeedMultiplier;
+        const timeScale = baseTimeScale;
 
         if (state.magnetTimer > 0) {
           state.magnetTimer -= delta;
@@ -228,7 +241,7 @@ const App = () => {
         state.segments.forEach((seg) => (seg.y += stepMovement));
         state.magnets.forEach((mag) => (mag.y += stepMovement));
         state.x2Items.forEach((x2) => (x2.y += stepMovement));
-        
+
         const playerCenterX = player.x + player.width / 2;
         const playerCenterY = player.y + player.height / 2;
 
@@ -252,14 +265,21 @@ const App = () => {
           obs.y += (currentScrollSpeed + obs.speed) * timeScale;
         });
 
-        const currentSeg = state.segments.find(
-          (seg) => player.y + player.height / 2 >= seg.y && player.y + player.height / 2 <= seg.y + seg.height
+        // Находим все сегменты, перекрывающие тело игрока по вертикали
+        const playerTop = player.y;
+        const playerBottom = player.y + player.height;
+        const overlappingSegs = state.segments.filter(
+          (seg) => playerBottom > seg.y && playerTop < seg.y + seg.height
         );
-        const currentLeftW = currentSeg ? currentSeg.leftWidth : BASE_WALL;
-        const currentRightW = currentSeg ? currentSeg.rightWidth : BASE_WALL;
 
         if (player.isJumping) {
           player.x += player.vx * timeScale;
+
+          const currentSeg = state.segments.find(
+            (seg) => player.y + player.height / 2 >= seg.y && player.y + player.height / 2 <= seg.y + seg.height
+          );
+          const currentLeftW = currentSeg ? currentSeg.leftWidth : BASE_WALL;
+          const currentRightW = currentSeg ? currentSeg.rightWidth : BASE_WALL;
 
           if (player.vx > 0) {
             const rightBoundary = CANVAS_WIDTH - currentRightW - player.width;
@@ -277,25 +297,72 @@ const App = () => {
             }
           }
         } else {
+          // Корректный спуск с выступов
           if (player.side === 'left') {
-            player.x = currentLeftW;
+            const maxLeftW = overlappingSegs.length > 0
+              ? Math.max(...overlappingSegs.map((s) => s.leftWidth))
+              : BASE_WALL;
+
+            const headOnCollision = overlappingSegs.some(
+              (seg) => seg.leftWidth > player.x + 8
+            );
+
+            if (headOnCollision) {
+              state.gameOver = true;
+              setGameOver(true);
+            } else {
+              player.x = maxLeftW;
+            }
           } else {
-            player.x = CANVAS_WIDTH - currentRightW - player.width;
+            const maxRightW = overlappingSegs.length > 0
+              ? Math.max(...overlappingSegs.map((s) => s.rightWidth))
+              : BASE_WALL;
+
+            const headOnCollision = overlappingSegs.some(
+              (seg) => CANVAS_WIDTH - seg.rightWidth < player.x + player.width - 8
+            );
+
+            if (headOnCollision) {
+              state.gameOver = true;
+              setGameOver(true);
+            } else {
+              player.x = CANVAS_WIDTH - maxRightW - player.width;
+            }
           }
         }
 
-        // Генерация новых секций
+        // --- ГЕНЕРАЦИЯ СЕКЦИЙ ---
         const topSegment = state.segments[state.segments.length - 1];
         if (topSegment && topSegment.y >= -SEGMENT_HEIGHT) {
           const newY = topSegment.y - SEGMENT_HEIGHT;
-          const rand = Math.random();
           let leftW = BASE_WALL;
           let rightW = BASE_WALL;
 
-          if (rand < 0.4) {
-            leftW = PROTRUSION_WALL;
-          } else if (rand < 0.7) {
-            rightW = PROTRUSION_WALL;
+          if (state.protrusionLeftCount > 0) {
+            leftW = state.protrusionLeftWidth;
+            state.protrusionLeftCount -= 1;
+          } else if (state.protrusionRightCount > 0) {
+            rightW = state.protrusionRightWidth;
+            state.protrusionRightCount -= 1;
+          } else {
+            const rand = Math.random();
+            if (rand < 0.08) {
+              leftW = PROTRUSION_WALL;
+              state.protrusionLeftCount = 3 + Math.floor(Math.random() * 3);
+              state.protrusionLeftWidth = PROTRUSION_WALL;
+            } else if (rand < 0.16) {
+              rightW = PROTRUSION_WALL;
+              state.protrusionRightCount = 3 + Math.floor(Math.random() * 3);
+              state.protrusionRightWidth = PROTRUSION_WALL;
+            } else if (rand < 0.20) {
+              leftW = PROTRUSION_WALL_2;
+              state.protrusionLeftCount = 3 + Math.floor(Math.random() * 3);
+              state.protrusionLeftWidth = PROTRUSION_WALL_2;
+            } else if (rand < 0.24) {
+              rightW = PROTRUSION_WALL_2;
+              state.protrusionRightCount = 3 + Math.floor(Math.random() * 3);
+              state.protrusionRightWidth = PROTRUSION_WALL_2;
+            }
           }
 
           state.segments.push({
@@ -309,28 +376,77 @@ const App = () => {
           const freeRight = CANVAS_WIDTH - rightW - 30;
 
           const itemRoll = Math.random();
-          if (itemRoll < 0.01) {
+          if (itemRoll < 0.015) {
             const magX = freeLeft + Math.random() * (freeRight - freeLeft);
             state.magnets.push({
               x: magX,
               y: newY + SEGMENT_HEIGHT / 2,
             });
-          } else if (itemRoll < 0.02) {
+          } else if (itemRoll < 0.03) {
             const x2X = freeLeft + Math.random() * (freeRight - freeLeft);
             state.x2Items.push({
               x: x2X,
               y: newY + SEGMENT_HEIGHT / 2,
             });
-          } else if (itemRoll < 0.75) {
-            const coinCount = Math.random() < 0.35 ? 2 : 1;
-            for (let c = 0; c < coinCount; c++) {
-              const coinX = freeLeft + Math.random() * (freeRight - freeLeft);
-              state.coins.push({
-                x: coinX,
-                y: newY + (SEGMENT_HEIGHT / (coinCount + 1)) * (c + 1),
-                angle: Math.random() * Math.PI * 2,
-                collected: false,
-              });
+          } else if (itemRoll < 0.35) {
+            // Проверка наивысшей точки всех имеющихся монет
+            let minY = Infinity;
+            for (let i = 0; i < state.coins.length; i++) {
+              if (state.coins[i].y < minY) {
+                minY = state.coins[i].y;
+              }
+            }
+
+            // Безопасный зазор: новая группа монет спавнится только если старая ушла вниз минимум на 50px
+            const SAFE_GAP = 50;
+            const canSpawnPattern = minY > newY + SAFE_GAP;
+
+            if (canSpawnPattern) {
+              const patternType = Math.random();
+
+              if (patternType < 0.4) {
+                // --- СЕТКА (3x3 или 4x3) ---
+                const cols = Math.random() < 0.5 ? 3 : 4;
+                const rows = 3;
+                const availableWidth = freeRight - freeLeft;
+                const spacingX = Math.min(36, availableWidth / cols);
+                const spacingY = 36;
+
+                const gridWidth = (cols - 1) * spacingX;
+                const startX = freeLeft + (availableWidth - gridWidth) / 2;
+                const startY = newY;
+
+                for (let r = 0; r < rows; r++) {
+                  for (let c = 0; c < cols; c++) {
+                    state.coins.push({
+                      x: startX + c * spacingX,
+                      y: startY - r * spacingY,
+                      angle: Math.random() * Math.PI * 2,
+                      collected: false,
+                    });
+                  }
+                }
+              } else if (patternType < 0.7) {
+                // --- ВЕРТИКАЛЬНАЯ ЦЕПОЧКА ---
+                const coinX = freeLeft + Math.random() * (freeRight - freeLeft);
+                for (let c = 0; c < 3; c++) {
+                  state.coins.push({
+                    x: coinX,
+                    y: newY - c * 38,
+                    angle: Math.random() * Math.PI * 2,
+                    collected: false,
+                  });
+                }
+              } else {
+                // --- ОДИНОЧНАЯ МОНЕТА ---
+                const coinX = freeLeft + Math.random() * (freeRight - freeLeft);
+                state.coins.push({
+                  x: coinX,
+                  y: newY + SEGMENT_HEIGHT / 2,
+                  angle: Math.random() * Math.PI * 2,
+                  collected: false,
+                });
+              }
             }
           }
         }
@@ -361,6 +477,7 @@ const App = () => {
             player.y + player.height > x2.y - X2_HITBOX
           ) {
             state.x2Timer = X2_DURATION;
+            setIsX2Active(true);
             state.x2Items.splice(i, 1);
           } else if (x2.y > CANVAS_HEIGHT) {
             state.x2Items.splice(i, 1);
@@ -371,9 +488,9 @@ const App = () => {
         spawnTimerRef.current += timeScale;
         if (spawnTimerRef.current >= OBS_SPAWN_RATE) {
           spawnTimerRef.current %= OBS_SPAWN_RATE;
-          
-          const minCorridorX = PROTRUSION_WALL + OBS_SIZE / 2;
-          const maxCorridorX = CANVAS_WIDTH - PROTRUSION_WALL - OBS_SIZE / 2;
+
+          const minCorridorX = PROTRUSION_WALL_2 + OBS_SIZE / 2;
+          const maxCorridorX = CANVAS_WIDTH - PROTRUSION_WALL_2 - OBS_SIZE / 2;
 
           let spawnX;
           if (Math.random() < 0.4) {
@@ -404,7 +521,8 @@ const App = () => {
             player.y + player.height > coin.y - COIN_HITBOX
           ) {
             coin.collected = true;
-            state.score += 1;
+            const pointsGained = state.x2Timer > 0 ? 2 : 1;
+            state.score += pointsGained;
             setScore(state.score);
             state.coins.splice(i, 1);
           } else if (coin.y > CANVAS_HEIGHT) {
@@ -595,6 +713,38 @@ const App = () => {
 
   return (
     <div style={{ position: 'relative', touchAction: 'none' }}>
+      {/* Счетчик монет */}
+      <div style={{
+        position: 'absolute',
+        top: '16px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        padding: '8px 20px',
+        borderRadius: '20px',
+        color: '#ffd700',
+        fontSize: '22px',
+        fontWeight: 'bold',
+        fontFamily: 'sans-serif',
+        boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
+        pointerEvents: 'none',
+        userSelect: 'none',
+        zIndex: 10
+      }}>
+        <img 
+          src={coinImgSrc} 
+          alt="coin" 
+          style={{ width: '24px', height: '24px', objectFit: 'contain' }} 
+        />
+        <span>{score}</span>
+        {isX2Active && (
+          <span style={{ color: '#ff4d4d', fontSize: '16px', marginLeft: '6px' }}>x2!</span>
+        )}
+      </div>
+
       <canvas
         ref={canvasRef}
         style={{
