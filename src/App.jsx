@@ -46,6 +46,9 @@ const X2_SIZE = 45;
 const X2_HITBOX = 16;
 const X2_DURATION = 10;
 
+// Минимальная вертикальная дистанция между любыми бонусами (px)
+const POWERUP_SAFE_GAP = 400;
+
 const App = () => {
   const canvasRef = useRef(null);
   const coinImageRef = useRef(null);
@@ -64,6 +67,7 @@ const App = () => {
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [isX2Active, setIsX2Active] = useState(false);
+  const [isMagnetActive, setIsMagnetActive] = useState(false);
 
   const gameStateRef = useRef({
     gameOver: false,
@@ -169,6 +173,7 @@ const App = () => {
     lastTimeRef.current = performance.now();
     setScore(0);
     setIsX2Active(false);
+    setIsMagnetActive(false);
     setGameOver(false);
   };
 
@@ -229,12 +234,15 @@ const App = () => {
           }
         }
 
-        const timeScale = baseTimeScale;
-
         if (state.magnetTimer > 0) {
           state.magnetTimer -= delta;
-          if (state.magnetTimer < 0) state.magnetTimer = 0;
+          if (state.magnetTimer <= 0) {
+            state.magnetTimer = 0;
+            setIsMagnetActive(false);
+          }
         }
+
+        const timeScale = baseTimeScale;
 
         const stepMovement = currentScrollSpeed * timeScale;
 
@@ -265,7 +273,6 @@ const App = () => {
           obs.y += (currentScrollSpeed + obs.speed) * timeScale;
         });
 
-        // Находим все сегменты, перекрывающие тело игрока по вертикали
         const playerTop = player.y;
         const playerBottom = player.y + player.height;
         const overlappingSegs = state.segments.filter(
@@ -297,7 +304,6 @@ const App = () => {
             }
           }
         } else {
-          // Корректный спуск с выступов
           if (player.side === 'left') {
             const maxLeftW = overlappingSegs.length > 0
               ? Math.max(...overlappingSegs.map((s) => s.leftWidth))
@@ -375,21 +381,30 @@ const App = () => {
           const freeLeft = leftW + 30;
           const freeRight = CANVAS_WIDTH - rightW - 30;
 
+          let minPowerUpY = Infinity;
+          for (let i = 0; i < state.magnets.length; i++) {
+            if (state.magnets[i].y < minPowerUpY) minPowerUpY = state.magnets[i].y;
+          }
+          for (let i = 0; i < state.x2Items.length; i++) {
+            if (state.x2Items[i].y < minPowerUpY) minPowerUpY = state.x2Items[i].y;
+          }
+
+          const canSpawnPowerUp = (minPowerUpY - newY) >= POWERUP_SAFE_GAP;
+
           const itemRoll = Math.random();
-          if (itemRoll < 0.015) {
+          if (canSpawnPowerUp && itemRoll < 0.015) {
             const magX = freeLeft + Math.random() * (freeRight - freeLeft);
             state.magnets.push({
               x: magX,
               y: newY + SEGMENT_HEIGHT / 2,
             });
-          } else if (itemRoll < 0.03) {
+          } else if (canSpawnPowerUp && itemRoll < 0.03) {
             const x2X = freeLeft + Math.random() * (freeRight - freeLeft);
             state.x2Items.push({
               x: x2X,
               y: newY + SEGMENT_HEIGHT / 2,
             });
           } else if (itemRoll < 0.35) {
-            // Проверка наивысшей точки всех имеющихся монет
             let minY = Infinity;
             for (let i = 0; i < state.coins.length; i++) {
               if (state.coins[i].y < minY) {
@@ -397,7 +412,6 @@ const App = () => {
               }
             }
 
-            // Безопасный зазор: новая группа монет спавнится только если старая ушла вниз минимум на 50px
             const SAFE_GAP = 50;
             const canSpawnPattern = minY > newY + SAFE_GAP;
 
@@ -405,7 +419,6 @@ const App = () => {
               const patternType = Math.random();
 
               if (patternType < 0.4) {
-                // --- СЕТКА (3x3 или 4x3) ---
                 const cols = Math.random() < 0.5 ? 3 : 4;
                 const rows = 3;
                 const availableWidth = freeRight - freeLeft;
@@ -427,7 +440,6 @@ const App = () => {
                   }
                 }
               } else if (patternType < 0.7) {
-                // --- ВЕРТИКАЛЬНАЯ ЦЕПОЧКА ---
                 const coinX = freeLeft + Math.random() * (freeRight - freeLeft);
                 for (let c = 0; c < 3; c++) {
                   state.coins.push({
@@ -438,7 +450,6 @@ const App = () => {
                   });
                 }
               } else {
-                // --- ОДИНОЧНАЯ МОНЕТА ---
                 const coinX = freeLeft + Math.random() * (freeRight - freeLeft);
                 state.coins.push({
                   x: coinX,
@@ -461,6 +472,7 @@ const App = () => {
             player.y + player.height > mag.y - MAGNET_HITBOX
           ) {
             state.magnetTimer = MAGNET_DURATION;
+            setIsMagnetActive(true);
             state.magnets.splice(i, 1);
           } else if (mag.y > CANVAS_HEIGHT) {
             state.magnets.splice(i, 1);
@@ -712,8 +724,14 @@ const App = () => {
   }
 
   return (
-    <div style={{ position: 'relative', touchAction: 'none' }}>
-      {/* Счетчик монет */}
+    <div style={{ 
+      position: 'relative', 
+      touchAction: 'none',
+      WebkitTapHighlightColor: 'transparent',
+      userSelect: 'none',
+      WebkitUserSelect: 'none'
+    }}>
+      {/* Счетчик монет и бонусов */}
       <div style={{
         position: 'absolute',
         top: '16px',
@@ -743,6 +761,13 @@ const App = () => {
         {isX2Active && (
           <span style={{ color: '#ff4d4d', fontSize: '16px', marginLeft: '6px' }}>x2!</span>
         )}
+        {isMagnetActive && (
+          <img 
+            src={magnetImgSrc} 
+            alt="magnet" 
+            style={{ width: '22px', height: '22px', objectFit: 'contain', marginLeft: '4px' }} 
+          />
+        )}
       </div>
 
       <canvas
@@ -750,7 +775,8 @@ const App = () => {
         style={{
           touchAction: 'none',
           cursor: 'pointer',
-          display: 'block'
+          display: 'block',
+          WebkitTapHighlightColor: 'transparent'
         }}
       />
       {gameOver && (
@@ -767,12 +793,20 @@ const App = () => {
           alignItems: 'center',
           justifyContent: 'center',
           flexDirection: 'column',
-          gap: '10px',
+          gap: '12px',
           backgroundColor: 'rgba(0, 0, 0, 0.65)',
-          userSelect: 'none'
+          userSelect: 'none',
+          WebkitTapHighlightColor: 'transparent'
         }}>
           <p style={{ margin: 0 }}>Game Over</p>
-          <p style={{ fontSize: '18px', margin: 0 }}>{score} Huba Bubas</p>
+          <div style={{ fontSize: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>{score}</span>
+            <img 
+              src={coinImgSrc} 
+              alt="coin" 
+              style={{ width: '24px', height: '24px', objectFit: 'contain' }} 
+            />
+          </div>
           <button
             onClick={restartGame}
             onTouchStart={(e) => {
@@ -788,7 +822,8 @@ const App = () => {
               borderRadius: '8px',
               cursor: 'pointer',
               boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
-              touchAction: 'manipulation'
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
             }}
           >
             Restart
