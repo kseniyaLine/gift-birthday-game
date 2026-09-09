@@ -727,8 +727,8 @@ const App = () => {
     <div style={{ 
       position: 'relative',
     }}>
-      {/* Счетчик монет и бонусов */}
-      <div style={{
+        {!gameOver && (
+        <div style={{
         position: 'absolute',
         top: '16px',
         left: '50%',
@@ -765,6 +765,7 @@ const App = () => {
           />
         )}
       </div>
+        )}
 
       <canvas
         ref={canvasRef}
