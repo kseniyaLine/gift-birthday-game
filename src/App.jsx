@@ -412,7 +412,7 @@ const App = () => {
               }
             }
 
-            const SAFE_GAP = 50;
+            const SAFE_GAP = 80;
             const canSpawnPattern = minY > newY + SAFE_GAP;
 
             if (canSpawnPattern) {
@@ -725,11 +725,7 @@ const App = () => {
 
   return (
     <div style={{ 
-      position: 'relative', 
-      touchAction: 'none',
-      WebkitTapHighlightColor: 'transparent',
-      userSelect: 'none',
-      WebkitUserSelect: 'none'
+      position: 'relative',
     }}>
       {/* Счетчик монет и бонусов */}
       <div style={{
